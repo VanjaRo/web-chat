@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chat</title>
+    <script src="https://unpkg.com/vue"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div v-for="(message, key) in messages" :key="key">
+        <div class="msg_cotainer">
+          {{message.message}}
+          <span class="msg_time"></span>
+        </div>
+      </div>
+      <textarea
+        v-model="newMessage"
+        name=""
+        placeholder="Type your message..."
+        @keyup.enter.exact="sendMessage"
+      ></textarea>
+      <button @click="sendMessage">Send</button>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="assets/app.js"></script>
+</html>
