@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -36,18 +40,34 @@ type Client struct {
 	conn     *websocket.Conn
 	wsServer *WsServer
 	send     chan []byte
+	rooms    map[*Room]bool
+	Name     string    `json:"name"`
+	ID       uuid.UUID `json:"id"`
 }
 
-func newClient(conn *websocket.Conn, wsServer *WsServer) *Client {
+func newClient(conn *websocket.Conn, wsServer *WsServer, name string) *Client {
 	return &Client{
 		conn:     conn,
 		wsServer: wsServer,
 		send:     make(chan []byte, 256),
+		rooms:    make(map[*Room]bool),
+		Name:     name,
+		ID:       uuid.New(),
 	}
+}
+
+func (client *Client) GetName() string {
+	return client.Name
 }
 
 // ServeWs handles websocket requests from clients requests.
 func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
+
+	name := r.URL.Query().Get("name")
+	if len(name) == 0 {
+		log.Println("No 'name' provided in URL query")
+		return
+	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -55,7 +75,7 @@ func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := newClient(conn, wsServer)
+	client := newClient(conn, wsServer, name)
 
 	go client.writePump()
 	go client.readPump()
@@ -82,7 +102,7 @@ func (client *Client) readPump() {
 			}
 			break
 		}
-		client.wsServer.broadcast <- jsonMessage
+		client.handleNewMessage(jsonMessage)
 	}
 }
 
@@ -128,6 +148,103 @@ func (client *Client) writePump() {
 
 func (client *Client) disconnect() {
 	client.wsServer.unregister <- client
+	for room := range client.rooms {
+		room.unregister <- client
+	}
 	close(client.send)
 	client.conn.Close()
+}
+
+func (client *Client) handleNewMessage(jsonMessage []byte) {
+	var message Message
+	if err := json.Unmarshal(jsonMessage, &message); err != nil {
+		log.Printf("Error unmarshalling message: %v", err)
+		return
+	}
+	message.Sender = client
+
+	switch message.Action {
+	case SendMessageAction:
+		roomId := message.Target.GetId()
+
+		if room := client.wsServer.findRoomById(roomId); room != nil {
+			room.broadcast <- &message
+		}
+
+	case JoinRoomAction:
+		client.handleJoinRoomMessage(message)
+
+	case LeaveRoomAction:
+		client.handleLeaveRoomMessage(message)
+	case JoinRoomPrivateAction:
+		client.handleJoinRoomPrivateMessage(message)
+	}
+
+}
+
+func (client *Client) joinRoom(roomName string, sender *Client) {
+	// sender is the person to start a private chat with
+	room := client.wsServer.findRoomByName(roomName)
+	if room == nil {
+		// if sender is not included, it's a public chat
+		room = client.wsServer.createRoom(roomName, sender != nil)
+	}
+	if sender == nil && room.isPrivate() {
+		return
+	}
+	if !client.isInRoom(room) {
+		client.rooms[room] = true
+		room.register <- client
+		client.notifyRoomJoined(room, sender)
+	}
+
+}
+
+func (client *Client) isInRoom(room *Room) bool {
+	_, ok := client.rooms[room]
+	return ok
+}
+
+func (client *Client) notifyRoomJoined(room *Room, sender *Client) {
+	message := Message{
+		Action: RoomJoinedAction,
+		Sender: sender,
+		Target: room,
+	}
+	client.send <- message.encode()
+}
+
+func (client *Client) handleJoinRoomMessage(message Message) {
+	roomName := message.Message
+	client.joinRoom(roomName, nil)
+}
+
+func (client *Client) handleJoinRoomPrivateMessage(message Message) {
+	target := client.wsServer.findClientById(message.Message)
+	if target == nil {
+		return
+	}
+	ids := []string{client.ID.String(), target.ID.String()}
+	sort.Strings(ids)
+	// create a private room name by concatinating the two client id's
+	roomName := strings.Join(ids, "")
+
+	client.joinRoom(roomName, target)
+	target.joinRoom(roomName, client)
+
+}
+
+func (client *Client) handleLeaveRoomMessage(message Message) {
+	roomId := message.Message
+	room := client.wsServer.findRoomById(roomId)
+	if room == nil {
+		return
+	}
+
+	delete(client.rooms, room)
+	room.unregister <- client
+}
+
+func (client *Client) GetId() string {
+	return client.ID.String()
 }

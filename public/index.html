@@ -2,23 +2,104 @@
 <html>
   <head>
     <title>Chat</title>
-    <script src="https://unpkg.com/vue"></script>
+    <script src="https://unpkg.com/vue@3.2.28"></script>
   </head>
   <body>
     <div id="app">
-      <div v-for="(message, key) in messages" :key="key">
-        <div class="msg_cotainer">
-          {{message.message}}
-          <span class="msg_time"></span>
+      <div class="container h-100">
+        <div class="col-12">
+          <div class="row">
+            <div
+              class="col-2 card profile"
+              v-for="user in users"
+              :key="user.id"
+            >
+              <div class="card-header">{{user.name}}</div>
+              <div class="card-body">
+                <button class="btn btn-primary" @click="joinRoomPrivate(user)">
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row justify-content-center h-100">
+          <div class="col-12 form" v-if="!ws">
+            <div class="input-group">
+              <input
+                v-model="user.name"
+                class="form-control name"
+                placeholder="Please fill in your (nick)name"
+                @keyup.enter.exact="connect"
+              />
+              <div class="input-group-append">
+                <span class="input-group-text send_btn" @click="connect">
+                  >
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 room" v-if="ws != null">
+            <div class="input-group">
+              <input
+                v-model="roomInput"
+                class="form-control name"
+                placeholder="Type the room you want to join"
+                @keyup.enter.exact="joinRoom"
+              />
+              <div class="input-group-append">
+                <span class="input-group-text send_btn" @click="joinRoom">
+                  >
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat" v-for="(room, key) in rooms" :key="key">
+            <div class="card">
+              <div class="card-header msg_head">
+                <div class="d-flex bd-highlight justify-content-center">
+                  {{room.name}}
+                  <span class="card-close" @click="leaveRoom(room)">leave</span>
+                </div>
+              </div>
+              <div class="card-body msg_card_body">
+                <div
+                  v-for="(message, key) in room.messages"
+                  :key="key"
+                  class="d-flex justify-content-start mb-4"
+                >
+                  <div class="msg_cotainer">
+                    {{message.message}}
+                    <span class="msg_name" v-if="message.sender"
+                      >{{message.sender.name}}</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="card-footer">
+                <div class="input-group">
+                  <textarea
+                    v-model="room.newMessage"
+                    name=""
+                    class="form-control type_msg"
+                    placeholder="Type your message..."
+                    @keyup.enter.exact="sendMessage(room)"
+                  ></textarea>
+                  <div class="input-group-append">
+                    <span
+                      class="input-group-text send_btn"
+                      @click="sendMessage(room)"
+                      >></span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <textarea
-        v-model="newMessage"
-        name=""
-        placeholder="Type your message..."
-        @keyup.enter.exact="sendMessage"
-      ></textarea>
-      <button @click="sendMessage">Send</button>
     </div>
   </body>
 
