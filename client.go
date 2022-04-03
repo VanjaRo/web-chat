@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VanjaRo/web-chat/config"
+	"github.com/VanjaRo/web-chat/models"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -56,10 +58,6 @@ func newClient(conn *websocket.Conn, wsServer *WsServer, name string) *Client {
 	}
 }
 
-func (client *Client) GetName() string {
-	return client.Name
-}
-
 // ServeWs handles websocket requests from clients requests.
 func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
 
@@ -71,7 +69,7 @@ func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error upgrading connection: ", err)
 		return
 	}
 
@@ -182,21 +180,22 @@ func (client *Client) handleNewMessage(jsonMessage []byte) {
 
 }
 
-func (client *Client) joinRoom(roomName string, sender *Client) {
+func (client *Client) joinRoom(roomName string, sender models.User) *Room {
 	// sender is the person to start a private chat with
 	room := client.wsServer.findRoomByName(roomName)
 	if room == nil {
 		// if sender is not included, it's a public chat
 		room = client.wsServer.createRoom(roomName, sender != nil)
 	}
-	if sender == nil && room.isPrivate() {
-		return
+	if sender == nil && room.GetPrivate() {
+		return nil
 	}
 	if !client.isInRoom(room) {
 		client.rooms[room] = true
 		room.register <- client
 		client.notifyRoomJoined(room, sender)
 	}
+	return room
 
 }
 
@@ -205,7 +204,7 @@ func (client *Client) isInRoom(room *Room) bool {
 	return ok
 }
 
-func (client *Client) notifyRoomJoined(room *Room, sender *Client) {
+func (client *Client) notifyRoomJoined(room *Room, sender models.User) {
 	message := Message{
 		Action: RoomJoinedAction,
 		Sender: sender,
@@ -220,18 +219,32 @@ func (client *Client) handleJoinRoomMessage(message Message) {
 }
 
 func (client *Client) handleJoinRoomPrivateMessage(message Message) {
-	target := client.wsServer.findClientById(message.Message)
+	target := client.wsServer.findUserById(message.Message)
 	if target == nil {
 		return
 	}
-	ids := []string{client.ID.String(), target.ID.String()}
+	ids := []string{client.GetId(), target.GetId()}
 	sort.Strings(ids)
 	// create a private room name by concatinating the two client id's
 	roomName := strings.Join(ids, "")
 
-	client.joinRoom(roomName, target)
-	target.joinRoom(roomName, client)
+	room := client.joinRoom(roomName, target)
+	if room != nil {
+		client.inviteTargetUser(target, room)
+	}
 
+}
+
+func (client *Client) inviteTargetUser(target models.User, room *Room) {
+	inviteMessage := Message{
+		Action:  JoinRoomPrivateAction,
+		Sender:  client,
+		Target:  room,
+		Message: target.GetId(),
+	}
+	if err := config.Redis.Publish(ctx, PubSubGeneralChannel, inviteMessage.encode()).Err(); err != nil {
+		log.Printf("Error publishing message: %v", err)
+	}
 }
 
 func (client *Client) handleLeaveRoomMessage(message Message) {
@@ -247,4 +260,8 @@ func (client *Client) handleLeaveRoomMessage(message Message) {
 
 func (client *Client) GetId() string {
 	return client.ID.String()
+}
+
+func (client *Client) GetName() string {
+	return client.Name
 }

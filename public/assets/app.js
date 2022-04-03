@@ -17,13 +17,16 @@ let webSocket = {
   data() {
     return {
       ws: null,
-      serverUrl: "ws://localhost:8080/ws",
+      serverUrl: "ws://" + location.host + "/ws",
       roomInput: null,
       rooms: [],
       user: {
         name: "",
       },
       users: [],
+      initialReconnectDelay: 1000,
+      currentReconnectDelay: 0,
+      maxReconnectDelay: 15000,
     };
   },
   methods: {
@@ -38,6 +41,22 @@ let webSocket = {
       this.ws.addEventListener("message", (event) => {
         this.handleNewMessage(event);
       });
+      this.ws.addEventListener("close", (event) => {
+        this.onWebsocketClose(event);
+      });
+    },
+    onWebsocketClose() {
+      this.ws = null;
+      // reconnect clients in a random time between 1 and 15 seconds
+      setTimeout(() => {
+        this.reconnectToWebsocket();
+      }, this.currentReconnectDelay + Math.floor(Math.random() * 3000));
+    },
+    reconnectToWebsocket() {
+      if (this.currentReconnectDelay < this.maxReconnectDelay) {
+        this.currentReconnectDelay *= 2;
+      }
+      this.connectToWebsocket();
     },
     handleNewMessage(event) {
       let data = event.data;
@@ -117,7 +136,6 @@ let webSocket = {
       this.rooms.splice(this.rooms.indexOf(room), 1);
     },
     handleUserJoined(msg) {
-      console.log(msg);
       this.users.push(msg.sender);
     },
     handleUserLeft(msg) {
@@ -128,6 +146,7 @@ let webSocket = {
       }
     },
     onWebsocketOpen() {
+      this.currentReconnectDelay = this.initialReconnectDelay;
       console.log("connected to WS!");
     },
   },

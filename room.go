@@ -1,6 +1,14 @@
 package main
 
-import "github.com/google/uuid"
+import (
+	"context"
+	"log"
+
+	"github.com/VanjaRo/web-chat/config"
+	"github.com/google/uuid"
+)
+
+var ctx = context.Background()
 
 type Room struct {
 	ID         uuid.UUID `json:"id"`
@@ -33,6 +41,7 @@ func (room *Room) GetName() string {
 }
 
 func (room *Room) Run() {
+	go room.subscribeRoomMessage()
 	for {
 		select {
 		case client := <-room.register:
@@ -40,7 +49,7 @@ func (room *Room) Run() {
 		case client := <-room.unregister:
 			room.unregisterClient(client)
 		case message := <-room.broadcast:
-			room.broadcastToClients(message.encode())
+			room.publishRoomMessage(message.encode())
 
 		}
 	}
@@ -67,9 +76,23 @@ func (room *Room) notifyClientJoined(client *Client) {
 		Target:  room,
 		Message: client.GetName() + " joined the room",
 	}
-	room.broadcastToClients(message.encode())
+	room.publishRoomMessage(message.encode())
 }
 
-func (room *Room) isPrivate() bool {
+func (room *Room) GetPrivate() bool {
 	return room.Private
+}
+
+func (room *Room) publishRoomMessage(message []byte) {
+	if err := config.Redis.Publish(ctx, room.GetName(), message).Err(); err != nil {
+		log.Println("Error publishing message to room:", err)
+	}
+}
+
+func (room *Room) subscribeRoomMessage() {
+	pubsub := config.Redis.Subscribe(ctx, room.GetName())
+	ch := pubsub.Channel()
+	for msg := range ch {
+		room.broadcastToClients([]byte(msg.Payload))
+	}
 }
