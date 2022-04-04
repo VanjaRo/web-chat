@@ -50,9 +50,6 @@ There is a JWT secret stored in ".env" file. Make shure to include one in format
 
 ## ToDo
 
-- User registration
-- Anonymous user separartion from Registered users
-- Anonymous user deletion after disconnect
 - Friends support
   - Adding/Removing from friends
   - Starting private chat only with friends
