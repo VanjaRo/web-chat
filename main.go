@@ -7,6 +7,7 @@ import (
 
 	"github.com/VanjaRo/web-chat/auth"
 	"github.com/VanjaRo/web-chat/config"
+	"github.com/VanjaRo/web-chat/handlers"
 	"github.com/VanjaRo/web-chat/repositories"
 )
 
@@ -23,14 +24,15 @@ func main() {
 	wsServer := NewWsServer(&repositories.RoomRepository{Db: db}, userRepository)
 	go wsServer.Run()
 
-	api := &Api{
+	api := &handlers.Api{
 		UserRepository: userRepository,
 	}
 
 	http.HandleFunc("/ws", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(wsServer, w, r)
 	}))
-	http.HandleFunc("/api/login", api.LoginHandler)
+	http.HandleFunc("/login", api.LoginHandler)
+	http.HandleFunc("/register", api.RegisterHandler)
 
 	fs := http.FileServer(http.Dir("./public"))
 	http.Handle("/", fs)

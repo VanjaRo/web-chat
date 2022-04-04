@@ -224,8 +224,8 @@ func (client *Client) handleJoinRoomMessage(message Message) {
 }
 
 func (client *Client) handleJoinRoomPrivateMessage(message Message) {
-	target := client.wsServer.findUserById(message.Message)
-	if target == nil {
+	target, err := client.wsServer.userRepository.FindUserById(message.Message)
+	if err != nil {
 		return
 	}
 	ids := []string{client.GetId(), target.GetId()}

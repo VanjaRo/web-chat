@@ -5,11 +5,18 @@ import (
 	"gorm.io/gorm"
 )
 
+// type FriendRequest struct {
+// 	gorm.Model
+// 	FromUser *User
+// 	ToUser   *User
+// }
+
 type User struct {
 	ID       string `gorm:"primaryKey; not null" json:"id"`
 	Name     string `gorm:"not null" json:"name"`
-	Username string `json:"username"`
 	Password string `json:"password"`
+	// Friends         []*User          `gorm:"many2many:friends;" json:"friends"`
+	// FRSended []*FriendRequest
 }
 
 func (user *User) GetId() string {
@@ -20,14 +27,19 @@ func (user *User) GetName() string {
 	return user.Name
 }
 
+func (user *User) GetPassword() string {
+	return user.Password
+}
+
 type UserRepository struct {
 	Db *gorm.DB
 }
 
-func (repo *UserRepository) AddUser(user interfaces.User) error {
+func (repo *UserRepository) AddUser(user interfaces.UserAuth) error {
 	var newUser User
 	newUser.ID = user.GetId()
 	newUser.Name = user.GetName()
+	newUser.Password = user.GetPassword()
 	return repo.Db.Create(&newUser).Error
 }
 
@@ -43,13 +55,15 @@ func (repo *UserRepository) FindUserById(id string) (interfaces.User, error) {
 	return &user, nil
 }
 
-func (repo *UserRepository) FindUserByUsername(username string) (*User, error) {
+func (repo *UserRepository) FindUserByName(username string) (*User, error) {
 	var user User
-	if err := repo.Db.First(&user, "username = ?", username).Error; err != nil {
+	if err := repo.Db.First(&user, "name = ?", username).Error; err != nil {
 		return &user, err
 	}
 	return &user, nil
 }
+
+// func (repo *UserRepository) GetAllFriends
 
 func (repo *UserRepository) GetAllUsers() ([]interfaces.User, error) {
 	var users []User

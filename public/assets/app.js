@@ -21,12 +21,15 @@ let webSocket = {
       roomInput: null,
       rooms: [],
       user: {
-        name: "",
         username: "",
         password: "",
         token: "",
       },
-      users: [],
+      userRegister: {
+        username: "",
+        password: "",
+      },
+      friends: [],
       initialReconnectDelay: 1000,
       currentReconnectDelay: 0,
       maxReconnectDelay: 15000,
@@ -39,7 +42,7 @@ let webSocket = {
     },
 
     async login() {
-      let response = await fetch("http://" + location.host + "/api/login", {
+      let response = await fetch("http://" + location.host + "/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -47,28 +50,47 @@ let webSocket = {
         body: JSON.stringify(this.user),
       });
       let data = await response.json();
-      if (data.status !== "undefined" && data.status == "error") {
-        this.loginError = "Login failed";
+      if (data.error) {
+        this.loginError = data.error;
       } else {
+        this.user.password = "";
         this.user.token = data.token;
         this.connect();
+      }
+    },
+    async register() {
+      let response = await fetch("http://" + location.host + "/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(this.userRegister),
+      });
+      let data = await response.json();
+      if (data.error) {
+        this.loginError = data.error;
+      } else {
+        this.user.username = this.userRegister.username;
+        this.user.password = this.userRegister.password;
+        this.login();
       }
     },
     connectToWebsocket() {
       if (this.user.token != "") {
         this.ws = new WebSocket(this.serverUrl + "?bearer=" + this.user.token);
+
+        this.ws.addEventListener("open", (event) => {
+          this.onWebsocketOpen(event);
+        });
+        this.ws.addEventListener("message", (event) => {
+          this.handleNewMessage(event);
+        });
+        this.ws.addEventListener("close", (event) => {
+          this.onWebsocketClose(event);
+        });
       } else {
-        this.ws = new WebSocket(this.serverUrl + "?name=" + this.user.name);
+        alert("Please login first");
       }
-      this.ws.addEventListener("open", (event) => {
-        this.onWebsocketOpen(event);
-      });
-      this.ws.addEventListener("message", (event) => {
-        this.handleNewMessage(event);
-      });
-      this.ws.addEventListener("close", (event) => {
-        this.onWebsocketClose(event);
-      });
     },
     onWebsocketClose() {
       this.ws = null;

@@ -44,7 +44,7 @@ func ComparePassword(password, hash string) (bool, error) {
 	parts := strings.Split(hash, "$")
 
 	c := &PasswordConfig{}
-	_, err := fmt.Scanf(parts[3], "m=%d,t=%d,p=%d", &c.memory, &c.time, &c.threads)
+	_, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &c.memory, &c.time, &c.threads)
 	if err != nil {
 		return false, err
 	}

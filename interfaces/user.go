@@ -5,8 +5,13 @@ type User interface {
 	GetName() string
 }
 
+type UserAuth interface {
+	User
+	GetPassword() string
+}
+
 type UserRepository interface {
-	AddUser(user User) error
+	AddUser(userAuth UserAuth) error
 	RemoveUser(user User) error
 	FindUserById(id string) (User, error)
 	GetAllUsers() ([]User, error)

@@ -9,23 +9,22 @@
     <div id="app">
       <div class="container h-100">
         <div class="col-12 form" v-if="!ws">
-          <h2>Anonymous log-in</h2>
-          <div class="input-group">
-            <input v-model="user.name" class="form-control name" placeholder="Please fill in your (nick)name"
-                   @keyup.enter.exact="connect"></input>
-            <div class="input-group-append">
-              <span class="input-group-text send_btn" @click="connect">
-                >
-              </span>
-            </div>
-          </div>
-          <h2>Registered users</h2>
-        
+          <h2>Login</h2>
           <div class="input-group">
               <input v-model="user.username" class="form-control username" placeholder="username"></input>
               <input v-model="user.password" type="password" class="form-control password" placeholder="password"></input>
               <div class="input-group-append">
                   <span class="input-group-text send_btn" @click="login">
+                  >
+                  </span>
+              </div>
+          </div>
+          <h2>Registration</h2>
+          <div class="input-group">
+            <input v-model="userRegister.username" class="form-control username" placeholder="username"></input>
+            <input v-model="userRegister.password" type="password" class="form-control password" placeholder="password"></input>
+              <div class="input-group-append">
+                  <span class="input-group-text send_btn" @click="register">
                   >
                   </span>
               </div>
@@ -37,10 +36,10 @@
         
         </div>
         <div class="col-12">
-          <div class="row">
+          <div class="row" v-if="!ws">
             <div
               class="col-2 card profile"
-              v-for="user in users"
+              v-for="user in friends"
               :key="user.id"
             >
               <div class="card-header">{{user.name}}</div>

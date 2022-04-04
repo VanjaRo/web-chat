@@ -23,7 +23,6 @@ type WsServer struct {
 }
 
 func NewWsServer(roomRepository interfaces.RoomRepository, userRepository interfaces.UserRepository) *WsServer {
-	var err error
 	wsServer := &WsServer{
 		clients:        make(map[*Client]bool),
 		register:       make(chan *Client),
@@ -32,10 +31,6 @@ func NewWsServer(roomRepository interfaces.RoomRepository, userRepository interf
 		rooms:          make(map[*Room]bool),
 		roomRepository: roomRepository,
 		userRepository: userRepository,
-	}
-	wsServer.users, err = userRepository.GetAllUsers()
-	if err != nil {
-		panic(err)
 	}
 	return wsServer
 }
@@ -56,9 +51,9 @@ func (ws *WsServer) Run() {
 }
 
 func (ws *WsServer) registerClient(client *Client) {
-	if user := ws.findUserById(client.GetId()); user != nil {
-		ws.userRepository.AddUser(client)
-	}
+	// if user := ws.findUserById(client.GetId()); user == nil {
+	// 	ws.userRepository.AddUser(client)
+	// }
 
 	ws.publishClientJoined(client)
 
@@ -119,16 +114,16 @@ func (ws *WsServer) findRoomById(id string) *Room {
 	return targetRoom
 }
 
-func (ws *WsServer) findClientById(id string) *Client {
-	var targetClient *Client
-	for client := range ws.clients {
-		if client.GetId() == id {
-			targetClient = client
-			break
-		}
-	}
-	return targetClient
-}
+// func (ws *WsServer) findClientById(id string) *Client {
+// 	var targetClient *Client
+// 	for client := range ws.clients {
+// 		if client.GetId() == id {
+// 			targetClient = client
+// 			break
+// 		}
+// 	}
+// 	return targetClient
+// }
 
 func (ws *WsServer) findClientsById(id string) []*Client {
 	var targetClients []*Client
@@ -227,13 +222,13 @@ func (ws *WsServer) handleUserLeft(message Message) {
 	ws.broadcastToClients(message.encode())
 }
 
-func (ws *WsServer) findUserById(ID string) interfaces.User {
-	var targetUser interfaces.User
-	for _, user := range ws.users {
-		if user.GetId() == ID {
-			targetUser = user
-			break
-		}
-	}
-	return targetUser
-}
+// func (ws *WsServer) findUserById(ID string) interfaces.User {
+// 	var targetUser interfaces.User
+// 	for _, user := range ws.users {
+// 		if user.GetId() == ID {
+// 			targetUser = user
+// 			break
+// 		}
+// 	}
+// 	return targetUser
+// }
