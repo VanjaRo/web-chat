@@ -3,10 +3,39 @@
   <head>
     <title>Chat</title>
     <script src="https://unpkg.com/vue@3.2.28"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   </head>
   <body>
     <div id="app">
       <div class="container h-100">
+        <div class="col-12 form" v-if="!ws">
+          <h2>Anonymous log-in</h2>
+          <div class="input-group">
+            <input v-model="user.name" class="form-control name" placeholder="Please fill in your (nick)name"
+                   @keyup.enter.exact="connect"></input>
+            <div class="input-group-append">
+              <span class="input-group-text send_btn" @click="connect">
+                >
+              </span>
+            </div>
+          </div>
+          <h2>Registered users</h2>
+        
+          <div class="input-group">
+              <input v-model="user.username" class="form-control username" placeholder="username"></input>
+              <input v-model="user.password" type="password" class="form-control password" placeholder="password"></input>
+              <div class="input-group-append">
+                  <span class="input-group-text send_btn" @click="login">
+                  >
+                  </span>
+              </div>
+          </div>
+        
+          <div class="alert alert-danger" role="alert" v-show="loginError">
+            {{loginError}}
+          </div>
+        
+        </div>
         <div class="col-12">
           <div class="row">
             <div
@@ -24,21 +53,6 @@
           </div>
         </div>
         <div class="row justify-content-center h-100">
-          <div class="col-12 form" v-if="!ws">
-            <div class="input-group">
-              <input
-                v-model="user.name"
-                class="form-control name"
-                placeholder="Please fill in your (nick)name"
-                @keyup.enter.exact="connect"
-              />
-              <div class="input-group-append">
-                <span class="input-group-text send_btn" @click="connect">
-                  >
-                </span>
-              </div>
-            </div>
-          </div>
 
           <div class="col-12 room" v-if="ws != null">
             <div class="input-group">

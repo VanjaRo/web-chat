@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VanjaRo/web-chat/auth"
 	"github.com/VanjaRo/web-chat/config"
-	"github.com/VanjaRo/web-chat/models"
+	"github.com/VanjaRo/web-chat/interfaces"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -47,8 +48,8 @@ type Client struct {
 	ID       uuid.UUID `json:"id"`
 }
 
-func newClient(conn *websocket.Conn, wsServer *WsServer, name string) *Client {
-	return &Client{
+func newClient(conn *websocket.Conn, wsServer *WsServer, name, ID string) *Client {
+	client := &Client{
 		conn:     conn,
 		wsServer: wsServer,
 		send:     make(chan []byte, 256),
@@ -56,16 +57,20 @@ func newClient(conn *websocket.Conn, wsServer *WsServer, name string) *Client {
 		Name:     name,
 		ID:       uuid.New(),
 	}
+	client.ID, _ = uuid.Parse(ID)
+	return client
 }
 
 // ServeWs handles websocket requests from clients requests.
 func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
 
-	name := r.URL.Query().Get("name")
-	if len(name) == 0 {
-		log.Println("No 'name' provided in URL query")
+	userCtxVal := r.Context().Value(auth.UserContextKey)
+	if userCtxVal == nil {
+		log.Printf("Error: User not authenticated")
 		return
 	}
+
+	user := userCtxVal.(interfaces.User)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -73,7 +78,7 @@ func ServeWs(wsServer *WsServer, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := newClient(conn, wsServer, name)
+	client := newClient(conn, wsServer, user.GetName(), user.GetId())
 
 	go client.writePump()
 	go client.readPump()
@@ -180,7 +185,7 @@ func (client *Client) handleNewMessage(jsonMessage []byte) {
 
 }
 
-func (client *Client) joinRoom(roomName string, sender models.User) *Room {
+func (client *Client) joinRoom(roomName string, sender interfaces.User) *Room {
 	// sender is the person to start a private chat with
 	room := client.wsServer.findRoomByName(roomName)
 	if room == nil {
@@ -204,7 +209,7 @@ func (client *Client) isInRoom(room *Room) bool {
 	return ok
 }
 
-func (client *Client) notifyRoomJoined(room *Room, sender models.User) {
+func (client *Client) notifyRoomJoined(room *Room, sender interfaces.User) {
 	message := Message{
 		Action: RoomJoinedAction,
 		Sender: sender,
@@ -235,7 +240,7 @@ func (client *Client) handleJoinRoomPrivateMessage(message Message) {
 
 }
 
-func (client *Client) inviteTargetUser(target models.User, room *Room) {
+func (client *Client) inviteTargetUser(target interfaces.User, room *Room) {
 	inviteMessage := Message{
 		Action:  JoinRoomPrivateAction,
 		Sender:  client,

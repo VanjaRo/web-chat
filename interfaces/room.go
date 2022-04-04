@@ -1,4 +1,4 @@
-package models
+package interfaces
 
 type Room interface {
 	GetId() string

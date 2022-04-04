@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/VanjaRo/web-chat/models"
+	"github.com/VanjaRo/web-chat/interfaces"
 )
 
 // types of actions for a message
@@ -19,10 +19,10 @@ const (
 )
 
 type Message struct {
-	Action  string      `json:"action"`
-	Message string      `json:"message"`
-	Target  *Room       `json:"target"`
-	Sender  models.User `json:"sender"`
+	Action  string          `json:"action"`
+	Message string          `json:"message"`
+	Target  *Room           `json:"target"`
+	Sender  interfaces.User `json:"sender"`
 }
 
 func (message *Message) encode() []byte {

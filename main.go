@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/VanjaRo/web-chat/auth"
 	"github.com/VanjaRo/web-chat/config"
 	"github.com/VanjaRo/web-chat/repositories"
 )
@@ -17,12 +18,20 @@ func main() {
 	config.InitRedis()
 	db := config.InitDB()
 
-	wsServer := NewWsServer(&repositories.RoomRepository{Db: db}, &repositories.UserRepository{Db: db})
+	userRepository := &repositories.UserRepository{Db: db}
+
+	wsServer := NewWsServer(&repositories.RoomRepository{Db: db}, userRepository)
 	go wsServer.Run()
 
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	api := &Api{
+		UserRepository: userRepository,
+	}
+
+	http.HandleFunc("/ws", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(wsServer, w, r)
-	})
+	}))
+	http.HandleFunc("/api/login", api.LoginHandler)
+
 	fs := http.FileServer(http.Dir("./public"))
 	http.Handle("/", fs)
 

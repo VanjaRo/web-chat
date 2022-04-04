@@ -22,19 +22,44 @@ let webSocket = {
       rooms: [],
       user: {
         name: "",
+        username: "",
+        password: "",
+        token: "",
       },
       users: [],
       initialReconnectDelay: 1000,
       currentReconnectDelay: 0,
       maxReconnectDelay: 15000,
+      loginError: "",
     };
   },
   methods: {
     connect() {
       this.connectToWebsocket();
     },
+
+    async login() {
+      let response = await fetch("http://" + location.host + "/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(this.user),
+      });
+      let data = await response.json();
+      if (data.status !== "undefined" && data.status == "error") {
+        this.loginError = "Login failed";
+      } else {
+        this.user.token = data.token;
+        this.connect();
+      }
+    },
     connectToWebsocket() {
-      this.ws = new WebSocket(this.serverUrl + "?name=" + this.user.name);
+      if (this.user.token != "") {
+        this.ws = new WebSocket(this.serverUrl + "?bearer=" + this.user.token);
+      } else {
+        this.ws = new WebSocket(this.serverUrl + "?name=" + this.user.name);
+      }
       this.ws.addEventListener("open", (event) => {
         this.onWebsocketOpen(event);
       });
@@ -136,7 +161,17 @@ let webSocket = {
       this.rooms.splice(this.rooms.indexOf(room), 1);
     },
     handleUserJoined(msg) {
-      this.users.push(msg.sender);
+      if (!this.userExists(msg.sender)) {
+        this.users.push(msg.sender);
+      }
+    },
+    userExists(user) {
+      for (let i = 0; i < this.users.length; i++) {
+        if (this.users[i].id === user.id) {
+          return true;
+        }
+      }
+      return false;
     },
     handleUserLeft(msg) {
       for (let i = 0; i < this.users.length; i++) {

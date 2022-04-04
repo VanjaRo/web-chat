@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"github.com/VanjaRo/web-chat/models"
+	"github.com/VanjaRo/web-chat/interfaces"
 	"gorm.io/gorm"
 )
 
@@ -27,11 +27,11 @@ type RoomRepository struct {
 	Db *gorm.DB
 }
 
-func (repo *RoomRepository) AddRoom(room models.Room) error {
+func (repo *RoomRepository) AddRoom(room interfaces.Room) error {
 	return repo.Db.Create(&Room{room.GetId(), room.GetName(), room.GetPrivate()}).Error
 }
 
-func (repo *RoomRepository) FindRoomByName(name string) (models.Room, error) {
+func (repo *RoomRepository) FindRoomByName(name string) (interfaces.Room, error) {
 	var room Room
 	if err := repo.Db.First(&room, "name = ?", name).Error; err != nil {
 		return &room, err

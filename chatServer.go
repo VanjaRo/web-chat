@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/VanjaRo/web-chat/config"
-	"github.com/VanjaRo/web-chat/models"
+	"github.com/VanjaRo/web-chat/interfaces"
 	"github.com/google/uuid"
 )
 
@@ -17,12 +17,12 @@ type WsServer struct {
 	unregister     chan *Client
 	broadcast      chan []byte
 	rooms          map[*Room]bool
-	users          []models.User
-	roomRepository models.RoomRepository
-	userRepository models.UserRepository
+	users          []interfaces.User
+	roomRepository interfaces.RoomRepository
+	userRepository interfaces.UserRepository
 }
 
-func NewWsServer(roomRepository models.RoomRepository, userRepository models.UserRepository) *WsServer {
+func NewWsServer(roomRepository interfaces.RoomRepository, userRepository interfaces.UserRepository) *WsServer {
 	var err error
 	wsServer := &WsServer{
 		clients:        make(map[*Client]bool),
@@ -56,7 +56,9 @@ func (ws *WsServer) Run() {
 }
 
 func (ws *WsServer) registerClient(client *Client) {
-	ws.userRepository.AddUser(client)
+	if user := ws.findUserById(client.GetId()); user != nil {
+		ws.userRepository.AddUser(client)
+	}
 
 	ws.publishClientJoined(client)
 
@@ -68,8 +70,6 @@ func (ws *WsServer) registerClient(client *Client) {
 func (ws *WsServer) unregisterClient(client *Client) {
 	if _, ok := ws.clients[client]; ok {
 		delete(ws.clients, client)
-
-		ws.userRepository.RemoveUser(client)
 
 		ws.publishClientLeft(client)
 	}
@@ -130,6 +130,16 @@ func (ws *WsServer) findClientById(id string) *Client {
 	return targetClient
 }
 
+func (ws *WsServer) findClientsById(id string) []*Client {
+	var targetClients []*Client
+	for client := range ws.clients {
+		if client.GetId() == id {
+			targetClients = append(targetClients, client)
+		}
+	}
+	return targetClients
+}
+
 func (ws *WsServer) createRoom(roomName string, private bool) *Room {
 	room := NewRoom(roomName, private)
 	ws.roomRepository.AddRoom(room)
@@ -140,13 +150,16 @@ func (ws *WsServer) createRoom(roomName string, private bool) *Room {
 }
 
 func (ws *WsServer) listOnlineClients(client *Client) {
+	var uniqueUsers = make(map[string]bool)
 	for _, user := range ws.users {
-		// log.Println("User: ", user.GetName())
-		message := &Message{
-			Action: UserJoinedAction,
-			Sender: user,
+		if _, ok := uniqueUsers[user.GetId()]; !ok {
+			message := &Message{
+				Action: UserJoinedAction,
+				Sender: user,
+			}
+			uniqueUsers[user.GetId()] = true
+			client.send <- message.encode()
 		}
-		client.send <- message.encode()
 	}
 }
 
@@ -192,8 +205,8 @@ func (ws *WsServer) listenPubSubChannel() {
 }
 
 func (ws *WsServer) handleUserJoinedPrivate(message Message) {
-	target := ws.findClientById(message.Message)
-	if target != nil {
+	targets := ws.findClientsById(message.Message)
+	for _, target := range targets {
 		target.joinRoom(message.Target.GetName(), message.Sender)
 	}
 }
@@ -208,13 +221,14 @@ func (ws *WsServer) handleUserLeft(message Message) {
 		if user.GetId() == message.Sender.GetId() {
 			ws.users[i] = ws.users[len(ws.users)-1]
 			ws.users = ws.users[:len(ws.users)-1]
+			break
 		}
 	}
 	ws.broadcastToClients(message.encode())
 }
 
-func (ws *WsServer) findUserById(ID string) models.User {
-	var targetUser models.User
+func (ws *WsServer) findUserById(ID string) interfaces.User {
+	var targetUser interfaces.User
 	for _, user := range ws.users {
 		if user.GetId() == ID {
 			targetUser = user

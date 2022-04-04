@@ -1,4 +1,4 @@
-package models
+package interfaces
 
 type User interface {
 	GetId() string
